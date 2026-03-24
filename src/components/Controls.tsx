@@ -26,13 +26,9 @@ export function Controls() {
   const clearPlanes = useSlicerStore((s) => s.clearPlanes)
 
   const getDefaultPosition = useCallback(() => {
-    if (modelBoundingBox) {
-      const center = new THREE.Vector3()
-      modelBoundingBox.getCenter(center)
-      return center
-    }
+    // Default to center (0,0,0) - Bounds centers the model
     return new THREE.Vector3(0, 0, 0)
-  }, [modelBoundingBox])
+  }, [])
 
   const handleAddPlane = useCallback(
     (normal: [number, number, number]) => {
@@ -48,12 +44,11 @@ export function Controls() {
 
   const handlePositionChange = useCallback(
     (id: string, axis: 'x' | 'y' | 'z', value: number) => {
-      const plane = planes.find((p) => p.id === id)
-      if (plane) {
-        const newPos = plane.position.clone()
-        newPos[axis] = value
-        updatePlane(id, { position: newPos })
-      }
+      updatePlane(id, { position: new THREE.Vector3(
+        axis === 'x' ? value : planes.find(p => p.id === id)?.position.x ?? 0,
+        axis === 'y' ? value : planes.find(p => p.id === id)?.position.y ?? 0,
+        axis === 'z' ? value : planes.find(p => p.id === id)?.position.z ?? 0
+      )})
     },
     [planes, updatePlane]
   )
@@ -66,6 +61,20 @@ export function Controls() {
     if (Math.abs(normal.y) > 0.9) return 'y'  // Top
     if (Math.abs(normal.z) > 0.9) return 'z'  // Front
     return 'x'  // Side
+  }
+
+  // Calculate slider range based on bounding box
+  const getSliderRange = (axis: 'x' | 'y' | 'z'): { min: number; max: number; step: number } => {
+    if (modelBoundingBox) {
+      const size = new THREE.Vector3()
+      modelBoundingBox.getSize(size)
+      const halfSize = size[axis] / 2
+      // Range from -halfSize to +halfSize with appropriate step
+      const step = Math.max(0.01, halfSize / 100)
+      return { min: -halfSize, max: halfSize, step }
+    }
+    // Default range if no model loaded
+    return { min: -2, max: 2, step: 0.01 }
   }
 
   return (
@@ -98,13 +107,8 @@ export function Controls() {
       <div className="flex flex-col gap-3">
         {planes.map((plane) => {
           const axis = getAxisForNormal(plane.normal)
-          const range = modelBoundingBox
-            ? (() => {
-                const size = new THREE.Vector3()
-                modelBoundingBox.getSize(size)
-                return { min: -size[axis] / 2, max: size[axis] / 2 }
-              })()
-            : { min: -5, max: 5 }
+          const range = getSliderRange(axis)
+          const positionValue = plane.position[axis]
 
           return (
             <div
@@ -118,14 +122,9 @@ export function Controls() {
                     className="w-4 h-4 rounded-full border-2 border-white shadow"
                     style={{ backgroundColor: plane.color }}
                   />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium">
-                      {getOrientationLabel(plane.normal)} Plane
-                    </span>
-                    <span className="text-xs text-gray-400">
-                      Arrow shows cut direction
-                    </span>
-                  </div>
+                  <span className="text-sm font-medium">
+                    {getOrientationLabel(plane.normal)} Plane
+                  </span>
                 </div>
                 <div className="flex gap-1">
                   <button
@@ -148,22 +147,18 @@ export function Controls() {
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 w-12">
-                  {axis.toUpperCase()} pos:
-                </span>
+                <span className="text-xs text-gray-500 w-8">{axis.toUpperCase()}:</span>
                 <input
                   type="range"
                   min={range.min}
                   max={range.max}
-                  step={0.1}
-                  value={plane.position[axis]}
-                  onChange={(e) =>
-                    handlePositionChange(plane.id, axis, parseFloat(e.target.value))
-                  }
-                  className="flex-1"
+                  step={range.step}
+                  value={positionValue}
+                  onChange={(e) => handlePositionChange(plane.id, axis, parseFloat(e.target.value))}
+                  className="flex-1 cursor-pointer"
                 />
-                <span className="text-xs text-gray-600 w-10 text-right font-mono">
-                  {plane.position[axis].toFixed(1)}
+                <span className="text-xs text-gray-600 w-12 text-right font-mono">
+                  {positionValue.toFixed(2)}
                 </span>
               </div>
             </div>
