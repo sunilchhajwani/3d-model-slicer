@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls, Bounds } from '@react-three/drei'
+import { OrbitControls, Center } from '@react-three/drei'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useSlicerStore } from '../store'
@@ -9,12 +9,15 @@ import type { CuttingPlane } from '../store'
 // Store original materials to restore when planes change
 const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
 
+// Target size for normalized models
+const TARGET_SIZE = 2
+
 function ClippedModel({ url }: { url: string }) {
   const { scene } = useGLTF(url)
   const planes = useSlicerStore((s) => s.planes)
   const setModelBoundingBox = useSlicerStore((s) => s.setModelBoundingBox)
   const groupRef = useRef<THREE.Group>(null)
-  const [boundingBoxSet, setBoundingBoxSet] = useState(false)
+  const [scale, setScale] = useState(1)
 
   const clippingPlanes = useMemo(() => {
     return planes.filter((p) => p.enabled).map((p) => {
@@ -24,22 +27,27 @@ function ClippedModel({ url }: { url: string }) {
     })
   }, [planes])
 
-  // Update bounding box once after model loads
+  // Calculate scale and bounding box after model loads
   useEffect(() => {
-    if (groupRef.current && !boundingBoxSet) {
-      // Small delay to let Bounds component finish
-      const timeout = setTimeout(() => {
-        if (groupRef.current) {
-          const box = new THREE.Box3().setFromObject(groupRef.current)
-          if (box.min.x !== Infinity && box.max.x !== -Infinity) {
-            setModelBoundingBox(box)
-            setBoundingBoxSet(true)
-          }
-        }
-      }, 500)
-      return () => clearTimeout(timeout)
-    }
-  }, [setModelBoundingBox, boundingBoxSet])
+    if (!groupRef.current) return
+
+    // Calculate bounding box of original model
+    const box = new THREE.Box3().setFromObject(scene)
+    const size = new THREE.Vector3()
+    box.getSize(size)
+
+    // Calculate scale to fit target size
+    const maxDim = Math.max(size.x, size.y, size.z)
+    const newScale = maxDim > 0 ? TARGET_SIZE / maxDim : 1
+    setScale(newScale)
+
+    // Calculate scaled bounding box (centered at origin)
+    const scaledBox = new THREE.Box3(
+      new THREE.Vector3(-size.x * newScale / 2, -size.y * newScale / 2, -size.z * newScale / 2),
+      new THREE.Vector3(size.x * newScale / 2, size.y * newScale / 2, size.z * newScale / 2)
+    )
+    setModelBoundingBox(scaledBox)
+  }, [scene, setModelBoundingBox])
 
   useEffect(() => {
     scene.traverse((child) => {
@@ -73,11 +81,11 @@ function ClippedModel({ url }: { url: string }) {
   }, [scene, clippingPlanes])
 
   return (
-    <Bounds fit observe margin={1.2}>
+    <Center>
       <group ref={groupRef}>
-        <primitive object={scene} />
+        <primitive object={scene} scale={scale} />
       </group>
-    </Bounds>
+    </Center>
   )
 }
 
