@@ -27,15 +27,19 @@ export function Controls() {
 
   const handleAddPlane = useCallback(
     (normal: [number, number, number]) => {
-      // Planes start at center (0,0,0) - Bounds centers the model
+      // Get center from bounding box, or default to (0,0,0)
+      let center = new THREE.Vector3(0, 0, 0)
+      if (modelBoundingBox) {
+        modelBoundingBox.getCenter(center)
+      }
       addPlane({
-        position: new THREE.Vector3(0, 0, 0),
+        position: center,
         normal: new THREE.Vector3(...normal),
         enabled: true,
         color: '#ff6b6b',
       })
     },
-    [addPlane]
+    [addPlane, modelBoundingBox]
   )
 
   const handlePositionChange = useCallback(
