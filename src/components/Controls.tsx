@@ -59,9 +59,13 @@ export function Controls() {
   )
 
   const getAxisForNormal = (normal: THREE.Vector3): 'x' | 'y' | 'z' => {
-    if (Math.abs(normal.z) > 0.9) return 'z'
-    if (Math.abs(normal.y) > 0.9) return 'y'
-    return 'x'
+    // The plane moves along the axis of its normal
+    // Top (Axial) has normal [0, 1, 0] -> moves along Y
+    // Front (Coronal) has normal [0, 0, 1] -> moves along Z
+    // Side (Sagittal) has normal [1, 0, 0] -> moves along X
+    if (Math.abs(normal.y) > 0.9) return 'y'  // Top
+    if (Math.abs(normal.z) > 0.9) return 'z'  // Front
+    return 'x'  // Side
   }
 
   return (

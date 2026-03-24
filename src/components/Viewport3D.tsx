@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, Bounds } from '@react-three/drei'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -14,6 +14,7 @@ function ClippedModel({ url }: { url: string }) {
   const planes = useSlicerStore((s) => s.planes)
   const setModelBoundingBox = useSlicerStore((s) => s.setModelBoundingBox)
   const groupRef = useRef<THREE.Group>(null)
+  const [boundingBoxSet, setBoundingBoxSet] = useState(false)
 
   const clippingPlanes = useMemo(() => {
     return planes.filter((p) => p.enabled).map((p) => {
@@ -23,15 +24,22 @@ function ClippedModel({ url }: { url: string }) {
     })
   }, [planes])
 
-  // Update bounding box after model loads and Bounds centers it
-  useFrame(() => {
-    if (groupRef.current) {
-      const box = new THREE.Box3().setFromObject(groupRef.current)
-      if (box.min.x !== Infinity && box.max.x !== -Infinity) {
-        setModelBoundingBox(box)
-      }
+  // Update bounding box once after model loads
+  useEffect(() => {
+    if (groupRef.current && !boundingBoxSet) {
+      // Small delay to let Bounds component finish
+      const timeout = setTimeout(() => {
+        if (groupRef.current) {
+          const box = new THREE.Box3().setFromObject(groupRef.current)
+          if (box.min.x !== Infinity && box.max.x !== -Infinity) {
+            setModelBoundingBox(box)
+            setBoundingBoxSet(true)
+          }
+        }
+      }, 500)
+      return () => clearTimeout(timeout)
     }
-  })
+  }, [setModelBoundingBox, boundingBoxSet])
 
   useEffect(() => {
     scene.traverse((child) => {
