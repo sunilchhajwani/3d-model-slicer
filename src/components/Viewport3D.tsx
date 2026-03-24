@@ -53,12 +53,12 @@ function ClippedModel({ url }: { url: string }) {
   const { scene } = useGLTF(url)
   const planes = useSlicerStore((s) => s.planes)
   const setModelBoundingBox = useSlicerStore((s) => s.setModelBoundingBox)
-  const groupRef = useRef<THREE.Group>(null)
-  const lastBoundingBox = useRef<THREE.Box3 | null>(null)
+  // Ref is OUTSIDE Bounds to capture the final scaled size
+  const outerGroupRef = useRef<THREE.Group>(null)
+  const lastBoxKey = useRef<string | null>(null)
 
   const clippingPlanes = useMemo(() => {
     return planes.filter((p) => p.enabled).map((p) => {
-      // Calculate rotated normal
       const rotatedNormal = getRotatedNormal(p.normal, p.rotationX || 0, p.rotationY || 0)
       const plane = new THREE.Plane(rotatedNormal, 0)
       plane.constant = -p.position.dot(rotatedNormal)
@@ -66,16 +66,15 @@ function ClippedModel({ url }: { url: string }) {
     })
   }, [planes])
 
-  // Update bounding box continuously but only when it changes
+  // Capture bounding box from outer group - includes Bounds transformation
   useFrame(() => {
-    if (groupRef.current) {
-      const box = new THREE.Box3().setFromObject(groupRef.current)
+    if (outerGroupRef.current) {
+      const box = new THREE.Box3().setFromObject(outerGroupRef.current)
       if (box.min.x !== Infinity && box.max.x !== -Infinity) {
-        // Only update if bounding box actually changed
-        if (!lastBoundingBox.current ||
-            !lastBoundingBox.current.equals(box)) {
+        const boxKey = `${box.min.x.toFixed(4)},${box.min.y.toFixed(4)},${box.min.z.toFixed(4)},${box.max.x.toFixed(4)},${box.max.y.toFixed(4)},${box.max.z.toFixed(4)}`
+        if (boxKey !== lastBoxKey.current) {
+          lastBoxKey.current = boxKey
           setModelBoundingBox(box.clone())
-          lastBoundingBox.current = box.clone()
         }
       }
     }
@@ -84,12 +83,10 @@ function ClippedModel({ url }: { url: string }) {
   useEffect(() => {
     scene.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        // Store original material if not already stored
         if (!originalMaterials.has(child)) {
           originalMaterials.set(child, child.material)
         }
 
-        // Clone material to add clipping planes without modifying original
         const originalMaterial = originalMaterials.get(child)!
         if (Array.isArray(originalMaterial)) {
           child.material = originalMaterial.map((mat) => {
@@ -113,11 +110,11 @@ function ClippedModel({ url }: { url: string }) {
   }, [scene, clippingPlanes])
 
   return (
-    <Bounds fit observe margin={1.2}>
-      <group ref={groupRef}>
+    <group ref={outerGroupRef}>
+      <Bounds fit observe margin={1.2}>
         <primitive object={scene} />
-      </group>
-    </Bounds>
+      </Bounds>
+    </group>
   )
 }
 
