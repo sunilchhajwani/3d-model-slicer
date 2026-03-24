@@ -25,30 +25,30 @@ export function Controls() {
   const togglePlane = useSlicerStore((s) => s.togglePlane)
   const clearPlanes = useSlicerStore((s) => s.clearPlanes)
 
-  const getDefaultPosition = useCallback(() => {
-    // Default to center (0,0,0) - Bounds centers the model
-    return new THREE.Vector3(0, 0, 0)
-  }, [])
-
   const handleAddPlane = useCallback(
     (normal: [number, number, number]) => {
+      // Planes start at center (0,0,0) - Bounds centers the model
       addPlane({
-        position: getDefaultPosition(),
+        position: new THREE.Vector3(0, 0, 0),
         normal: new THREE.Vector3(...normal),
         enabled: true,
         color: '#ff6b6b',
       })
     },
-    [addPlane, getDefaultPosition]
+    [addPlane]
   )
 
   const handlePositionChange = useCallback(
     (id: string, axis: 'x' | 'y' | 'z', value: number) => {
-      updatePlane(id, { position: new THREE.Vector3(
-        axis === 'x' ? value : planes.find(p => p.id === id)?.position.x ?? 0,
-        axis === 'y' ? value : planes.find(p => p.id === id)?.position.y ?? 0,
-        axis === 'z' ? value : planes.find(p => p.id === id)?.position.z ?? 0
-      )})
+      const plane = planes.find((p) => p.id === id)
+      if (plane) {
+        const newPos = new THREE.Vector3(
+          axis === 'x' ? value : plane.position.x,
+          axis === 'y' ? value : plane.position.y,
+          axis === 'z' ? value : plane.position.z
+        )
+        updatePlane(id, { position: newPos })
+      }
     },
     [planes, updatePlane]
   )
@@ -69,12 +69,12 @@ export function Controls() {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
       const halfSize = size[axis] / 2
-      // Range from -halfSize to +halfSize with appropriate step
-      const step = Math.max(0.01, halfSize / 100)
+      // Ensure reasonable step size
+      const step = Math.max(0.01, halfSize / 50)
       return { min: -halfSize, max: halfSize, step }
     }
     // Default range if no model loaded
-    return { min: -2, max: 2, step: 0.01 }
+    return { min: -2, max: 2, step: 0.05 }
   }
 
   return (

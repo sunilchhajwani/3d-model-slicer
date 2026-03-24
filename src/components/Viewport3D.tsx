@@ -93,21 +93,25 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
 
+      // Ensure minimum size
+      const minSize = 0.5
+
       // Top (Axial): normal [0, 1, 0] - plane parallel to XZ, needs X and Z
       // Front (Coronal): normal [0, 0, 1] - plane parallel to XY, needs X and Y
       // Side (Sagittal): normal [1, 0, 0] - plane parallel to YZ, needs Y and Z
       if (Math.abs(normal.y) > 0.9) {
         // Top/Axial - horizontal plane, needs X and Z
-        return { gridWidth: size.x, gridHeight: size.z }
+        return { gridWidth: Math.max(size.x, minSize), gridHeight: Math.max(size.z, minSize) }
       } else if (Math.abs(normal.z) > 0.9) {
         // Front/Coronal - vertical plane facing front, needs X and Y
-        return { gridWidth: size.x, gridHeight: size.y }
+        return { gridWidth: Math.max(size.x, minSize), gridHeight: Math.max(size.y, minSize) }
       } else {
         // Side/Sagittal - vertical plane facing side, needs Y and Z
-        return { gridWidth: size.y, gridHeight: size.z }
+        return { gridWidth: Math.max(size.y, minSize), gridHeight: Math.max(size.z, minSize) }
       }
     }
-    return { gridWidth: 2, gridHeight: 2 }
+    // Default size when no model loaded
+    return { gridWidth: 3, gridHeight: 3 }
   }, [modelBoundingBox, normal])
 
   const rotation = useMemo(() => {
