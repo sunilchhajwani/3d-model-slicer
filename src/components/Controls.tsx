@@ -25,17 +25,27 @@ export function Controls() {
   const togglePlane = useSlicerStore((s) => s.togglePlane)
   const clearPlanes = useSlicerStore((s) => s.clearPlanes)
 
+  // Get the center of the model bounding box
+  const getModelCenter = useCallback(() => {
+    if (modelBoundingBox) {
+      const center = new THREE.Vector3()
+      modelBoundingBox.getCenter(center)
+      return center
+    }
+    return new THREE.Vector3(0, 0, 0)
+  }, [modelBoundingBox])
+
   const handleAddPlane = useCallback(
     (normal: [number, number, number]) => {
-      // Planes start at center (0,0,0) - Bounds centers the model
+      const center = getModelCenter()
       addPlane({
-        position: new THREE.Vector3(0, 0, 0),
+        position: center.clone(),
         normal: new THREE.Vector3(...normal),
         enabled: true,
         color: '#ff6b6b',
       })
     },
-    [addPlane]
+    [addPlane, getModelCenter]
   )
 
   const handlePositionChange = useCallback(
@@ -67,11 +77,18 @@ export function Controls() {
   const getSliderRange = (axis: 'x' | 'y' | 'z'): { min: number; max: number; step: number } => {
     if (modelBoundingBox) {
       const size = new THREE.Vector3()
+      const center = new THREE.Vector3()
       modelBoundingBox.getSize(size)
+      modelBoundingBox.getCenter(center)
+
       const halfSize = size[axis] / 2
-      // Ensure reasonable step size
+      // Range from center-halfSize to center+halfSize
       const step = Math.max(0.01, halfSize / 50)
-      return { min: -halfSize, max: halfSize, step }
+      return {
+        min: center[axis] - halfSize,
+        max: center[axis] + halfSize,
+        step
+      }
     }
     // Default range if no model loaded
     return { min: -2, max: 2, step: 0.05 }
