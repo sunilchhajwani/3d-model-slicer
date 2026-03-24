@@ -3,16 +3,16 @@ import * as THREE from 'three'
 import { useSlicerStore } from '../store'
 
 const ORIENTATION_PRESETS = [
-  { label: 'XY (Top)', normal: [0, 0, 1] as [number, number, number], description: 'Slices horizontally' },
-  { label: 'XZ (Front)', normal: [1, 0, 0] as [number, number, number], description: 'Slices from front' },
-  { label: 'YZ (Side)', normal: [0, 1, 0] as [number, number, number], description: 'Slices from side' },
+  { label: 'Top (Axial)', normal: [0, 1, 0] as [number, number, number], description: 'Horizontal slice - moves up/down' },
+  { label: 'Front (Coronal)', normal: [0, 0, 1] as [number, number, number], description: 'Vertical slice - moves front/back' },
+  { label: 'Side (Sagittal)', normal: [1, 0, 0] as [number, number, number], description: 'Vertical slice - moves left/right' },
 ]
 
 // Get orientation label from normal vector
 const getOrientationLabel = (normal: THREE.Vector3): string => {
-  if (Math.abs(normal.z) > 0.9) return 'XY'
-  if (Math.abs(normal.x) > 0.9) return 'XZ'
-  if (Math.abs(normal.y) > 0.9) return 'YZ'
+  if (Math.abs(normal.y) > 0.9) return 'Top'
+  if (Math.abs(normal.z) > 0.9) return 'Front'
+  if (Math.abs(normal.x) > 0.9) return 'Side'
   return 'Custom'
 }
 

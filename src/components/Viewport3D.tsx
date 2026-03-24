@@ -85,17 +85,17 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
 
-      // For XY plane (normal along Z), we need X and Y dimensions
-      // For XZ plane (normal along Y), we need X and Z dimensions
-      // For YZ plane (normal along X), we need Y and Z dimensions
-      if (Math.abs(normal.z) > 0.9) {
-        // XY plane - needs X and Y
-        return { gridWidth: size.x, gridHeight: size.y }
-      } else if (Math.abs(normal.y) > 0.9) {
-        // XZ plane - needs X and Z
+      // Top (Axial): normal [0, 1, 0] - plane parallel to XZ, needs X and Z
+      // Front (Coronal): normal [0, 0, 1] - plane parallel to XY, needs X and Y
+      // Side (Sagittal): normal [1, 0, 0] - plane parallel to YZ, needs Y and Z
+      if (Math.abs(normal.y) > 0.9) {
+        // Top/Axial - horizontal plane, needs X and Z
         return { gridWidth: size.x, gridHeight: size.z }
+      } else if (Math.abs(normal.z) > 0.9) {
+        // Front/Coronal - vertical plane facing front, needs X and Y
+        return { gridWidth: size.x, gridHeight: size.y }
       } else {
-        // YZ plane - needs Y and Z
+        // Side/Sagittal - vertical plane facing side, needs Y and Z
         return { gridWidth: size.y, gridHeight: size.z }
       }
     }
