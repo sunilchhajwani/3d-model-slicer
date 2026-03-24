@@ -129,21 +129,38 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
   const modelBoundingBox = useSlicerStore((s) => s.modelBoundingBox)
 
   // Calculate grid dimensions based on model bounding box
+  // Each plane orientation needs different dimensions
   const { gridWidth, gridHeight } = useMemo(() => {
     if (modelBoundingBox) {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
       const minSize = 0.5
-      const maxDim = Math.max(size.x, size.y, size.z)
 
-      // Use max dimension for all planes to ensure they cover the model when tilted
-      return {
-        gridWidth: Math.max(maxDim, minSize),
-        gridHeight: Math.max(maxDim, minSize)
+      // Top (Y normal): plane is parallel to XZ, needs X and Z
+      // Front (Z normal): plane is parallel to XY, needs X and Y
+      // Side (X normal): plane is parallel to YZ, needs Y and Z
+      if (Math.abs(baseNormal.y) > 0.9) {
+        // Top plane - needs X and Z
+        return {
+          gridWidth: Math.max(size.x, minSize),
+          gridHeight: Math.max(size.z, minSize)
+        }
+      } else if (Math.abs(baseNormal.z) > 0.9) {
+        // Front plane - needs X and Y
+        return {
+          gridWidth: Math.max(size.x, minSize),
+          gridHeight: Math.max(size.y, minSize)
+        }
+      } else {
+        // Side plane - needs Y and Z
+        return {
+          gridWidth: Math.max(size.y, minSize),
+          gridHeight: Math.max(size.z, minSize)
+        }
       }
     }
     return { gridWidth: 3, gridHeight: 3 }
-  }, [modelBoundingBox])
+  }, [modelBoundingBox, baseNormal])
 
   // Calculate plane rotation for visualization
   const rotation = useMemo(() => {
