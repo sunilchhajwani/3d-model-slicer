@@ -9,6 +9,46 @@ import type { CuttingPlane } from '../store'
 // Store original materials to restore when planes change
 const originalMaterials = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>()
 
+// Calculate rotated normal from base normal and rotation angles
+function getRotatedNormal(baseNormal: THREE.Vector3, rotationX: number, rotationY: number): THREE.Vector3 {
+  // Start with base normal
+  const normal = baseNormal.clone()
+
+  // Create rotation quaternions
+  // For a plane facing up (normal = [0,1,0]):
+  // - rotationX tilts it forward/back (around X axis)
+  // - rotationY tilts it left/right (around Z axis for horizontal plane)
+
+  // Find perpendicular axes for the plane
+  let tangent1 = new THREE.Vector3()
+  let tangent2 = new THREE.Vector3()
+
+  if (Math.abs(baseNormal.y) > 0.9) {
+    // Top plane (Y-up): X and Z are the plane's local axes
+    tangent1.set(1, 0, 0)  // X axis - for tiltX
+    tangent2.set(0, 0, 1)  // Z axis - for tiltY
+  } else if (Math.abs(baseNormal.z) > 0.9) {
+    // Front plane (Z-facing): X and Y are the plane's local axes
+    tangent1.set(1, 0, 0)  // X axis - for tiltY (rotate around Y actually)
+    tangent2.set(0, 1, 0)  // Y axis - for tiltX
+  } else {
+    // Side plane (X-facing): Y and Z are the plane's local axes
+    tangent1.set(0, 1, 0)  // Y axis - for tiltY
+    tangent2.set(0, 0, 1)  // Z axis - for tiltX
+  }
+
+  // Apply rotations in degrees
+  const quatX = new THREE.Quaternion().setFromAxisAngle(tangent1, THREE.MathUtils.degToRad(rotationX))
+  const quatY = new THREE.Quaternion().setFromAxisAngle(tangent2, THREE.MathUtils.degToRad(rotationY))
+
+  // Apply rotations to normal
+  normal.applyQuaternion(quatX)
+  normal.applyQuaternion(quatY)
+  normal.normalize()
+
+  return normal
+}
+
 function ClippedModel({ url }: { url: string }) {
   const { scene } = useGLTF(url)
   const planes = useSlicerStore((s) => s.planes)
@@ -18,8 +58,10 @@ function ClippedModel({ url }: { url: string }) {
 
   const clippingPlanes = useMemo(() => {
     return planes.filter((p) => p.enabled).map((p) => {
-      const plane = new THREE.Plane(p.normal, 0)
-      plane.constant = -p.position.dot(p.normal)
+      // Calculate rotated normal
+      const rotatedNormal = getRotatedNormal(p.normal, p.rotationX || 0, p.rotationY || 0)
+      const plane = new THREE.Plane(rotatedNormal, 0)
+      plane.constant = -p.position.dot(rotatedNormal)
       return plane
     })
   }, [planes])
@@ -81,51 +123,56 @@ function ClippedModel({ url }: { url: string }) {
 
 function PlaneHelper({ plane }: { plane: CuttingPlane }) {
   const position = plane.position
-  const normal = plane.normal
+  const baseNormal = plane.normal
+  const rotationX = plane.rotationX || 0
+  const rotationY = plane.rotationY || 0
   const modelBoundingBox = useSlicerStore((s) => s.modelBoundingBox)
 
   // Calculate grid dimensions based on model bounding box
-  // Use the actual dimensions needed for each plane orientation
   const { gridWidth, gridHeight } = useMemo(() => {
     if (modelBoundingBox) {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
-
-      // Ensure minimum size
       const minSize = 0.5
+      const maxDim = Math.max(size.x, size.y, size.z)
 
-      // Top (Axial): normal [0, 1, 0] - plane parallel to XZ, needs X and Z
-      // Front (Coronal): normal [0, 0, 1] - plane parallel to XY, needs X and Y
-      // Side (Sagittal): normal [1, 0, 0] - plane parallel to YZ, needs Y and Z
-      if (Math.abs(normal.y) > 0.9) {
-        // Top/Axial - horizontal plane, needs X and Z
-        return { gridWidth: Math.max(size.x, minSize), gridHeight: Math.max(size.z, minSize) }
-      } else if (Math.abs(normal.z) > 0.9) {
-        // Front/Coronal - vertical plane facing front, needs X and Y
-        return { gridWidth: Math.max(size.x, minSize), gridHeight: Math.max(size.y, minSize) }
-      } else {
-        // Side/Sagittal - vertical plane facing side, needs Y and Z
-        return { gridWidth: Math.max(size.y, minSize), gridHeight: Math.max(size.z, minSize) }
+      // Use max dimension for all planes to ensure they cover the model when tilted
+      return {
+        gridWidth: Math.max(maxDim, minSize),
+        gridHeight: Math.max(maxDim, minSize)
       }
     }
-    // Default size when no model loaded
     return { gridWidth: 3, gridHeight: 3 }
-  }, [modelBoundingBox, normal])
+  }, [modelBoundingBox])
 
+  // Calculate plane rotation for visualization
   const rotation = useMemo(() => {
-    const axis = new THREE.Vector3(0, 1, 0)
-    const quat = new THREE.Quaternion().setFromUnitVectors(axis, normal)
-    return new THREE.Euler().setFromQuaternion(quat)
-  }, [normal])
+    // Start with base rotation (to align plane with base normal)
+    const baseQuat = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 1, 0), // Default plane normal (Y-up)
+      baseNormal
+    )
 
-  // Create grid lines using lines
+    // Apply tilt rotations
+    const tiltX = THREE.MathUtils.degToRad(rotationX)
+    const tiltY = THREE.MathUtils.degToRad(rotationY)
+
+    // Create Euler for tilt (applied in local plane coordinates)
+    const tiltEuler = new THREE.Euler(tiltX, 0, tiltY)
+    const tiltQuat = new THREE.Quaternion().setFromEuler(tiltEuler)
+
+    // Combine rotations
+    const finalQuat = baseQuat.clone().multiply(tiltQuat)
+    return new THREE.Euler().setFromQuaternion(finalQuat)
+  }, [baseNormal, rotationX, rotationY])
+
+  // Create grid lines
   const gridLines = useMemo(() => {
     const lines: { start: THREE.Vector3; end: THREE.Vector3 }[] = []
     const divisions = 8
     const halfW = gridWidth / 2
     const halfH = gridHeight / 2
 
-    // Horizontal lines (across width)
     for (let i = 0; i <= divisions; i++) {
       const pos = -halfH + (i * gridHeight) / divisions
       lines.push({
@@ -133,7 +180,6 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
         end: new THREE.Vector3(halfW, 0, pos),
       })
     }
-    // Vertical lines (across height)
     for (let i = 0; i <= divisions; i++) {
       const pos = -halfW + (i * gridWidth) / divisions
       lines.push({

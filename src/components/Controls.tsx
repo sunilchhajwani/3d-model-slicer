@@ -25,27 +25,17 @@ export function Controls() {
   const togglePlane = useSlicerStore((s) => s.togglePlane)
   const clearPlanes = useSlicerStore((s) => s.clearPlanes)
 
-  // Get the center of the model bounding box
-  const getModelCenter = useCallback(() => {
-    if (modelBoundingBox) {
-      const center = new THREE.Vector3()
-      modelBoundingBox.getCenter(center)
-      return center
-    }
-    return new THREE.Vector3(0, 0, 0)
-  }, [modelBoundingBox])
-
   const handleAddPlane = useCallback(
     (normal: [number, number, number]) => {
-      const center = getModelCenter()
+      // Planes start at center (0,0,0) - Bounds centers the model
       addPlane({
-        position: center.clone(),
+        position: new THREE.Vector3(0, 0, 0),
         normal: new THREE.Vector3(...normal),
         enabled: true,
         color: '#ff6b6b',
       })
     },
-    [addPlane, getModelCenter]
+    [addPlane]
   )
 
   const handlePositionChange = useCallback(
@@ -58,6 +48,20 @@ export function Controls() {
           axis === 'z' ? value : plane.position.z
         )
         updatePlane(id, { position: newPos })
+      }
+    },
+    [planes, updatePlane]
+  )
+
+  const handleRotationChange = useCallback(
+    (id: string, axis: 'x' | 'y', value: number) => {
+      const plane = planes.find((p) => p.id === id)
+      if (plane) {
+        if (axis === 'x') {
+          updatePlane(id, { rotationX: value })
+        } else {
+          updatePlane(id, { rotationY: value })
+        }
       }
     },
     [planes, updatePlane]
@@ -163,6 +167,7 @@ export function Controls() {
                 </div>
               </div>
 
+              {/* Position slider */}
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500 w-8">{axis.toUpperCase()}:</span>
                 <input
@@ -177,6 +182,41 @@ export function Controls() {
                 <span className="text-xs text-gray-600 w-12 text-right font-mono">
                   {positionValue.toFixed(2)}
                 </span>
+              </div>
+
+              {/* Tilt sliders */}
+              <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-gray-200">
+                <span className="text-xs text-gray-500 font-medium">Tilt</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-8">X:</span>
+                  <input
+                    type="range"
+                    min={-45}
+                    max={45}
+                    step={1}
+                    value={plane.rotationX || 0}
+                    onChange={(e) => handleRotationChange(plane.id, 'x', parseFloat(e.target.value))}
+                    className="flex-1 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600 w-10 text-right font-mono">
+                    {plane.rotationX || 0}°
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400 w-8">Y:</span>
+                  <input
+                    type="range"
+                    min={-45}
+                    max={45}
+                    step={1}
+                    value={plane.rotationY || 0}
+                    onChange={(e) => handleRotationChange(plane.id, 'y', parseFloat(e.target.value))}
+                    className="flex-1 cursor-pointer"
+                  />
+                  <span className="text-xs text-gray-600 w-10 text-right font-mono">
+                    {plane.rotationY || 0}°
+                  </span>
+                </div>
               </div>
             </div>
           )

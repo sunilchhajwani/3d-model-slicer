@@ -4,7 +4,9 @@ import * as THREE from 'three'
 export interface CuttingPlane {
   id: string
   position: THREE.Vector3
-  normal: THREE.Vector3
+  normal: THREE.Vector3  // Base normal (before rotation)
+  rotationX?: number  // Tilt around local X axis (degrees)
+  rotationY?: number  // Tilt around local Y axis (degrees)
   enabled: boolean
   color: string
 }
@@ -51,7 +53,13 @@ export const useSlicerStore = create<SlicerState>((set, get) => ({
     const id = `plane-${++planeIdCounter}`
     const color = PLANE_COLORS[get().planes.length % PLANE_COLORS.length]
     set((state) => ({
-      planes: [...state.planes, { ...plane, id, color }],
+      planes: [...state.planes, {
+        ...plane,
+        id,
+        color,
+        rotationX: plane.rotationX ?? 0,
+        rotationY: plane.rotationY ?? 0
+      }],
     }))
   },
 
