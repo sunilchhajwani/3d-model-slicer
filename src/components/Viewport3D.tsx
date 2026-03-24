@@ -130,11 +130,15 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
 
   // Calculate grid dimensions based on model bounding box
   // Each plane orientation needs different dimensions
+  // Slightly smaller than model size to just cover it
   const { gridWidth, gridHeight } = useMemo(() => {
     if (modelBoundingBox) {
       const size = new THREE.Vector3()
       modelBoundingBox.getSize(size)
-      const minSize = 0.5
+      const minSize = 0.3
+
+      // Make plane slightly smaller than model (90% of size)
+      const scale = 0.9
 
       // Top (Y normal): plane is parallel to XZ, needs X and Z
       // Front (Z normal): plane is parallel to XY, needs X and Y
@@ -142,24 +146,24 @@ function PlaneHelper({ plane }: { plane: CuttingPlane }) {
       if (Math.abs(baseNormal.y) > 0.9) {
         // Top plane - needs X and Z
         return {
-          gridWidth: Math.max(size.x, minSize),
-          gridHeight: Math.max(size.z, minSize)
+          gridWidth: Math.max(size.x * scale, minSize),
+          gridHeight: Math.max(size.z * scale, minSize)
         }
       } else if (Math.abs(baseNormal.z) > 0.9) {
         // Front plane - needs X and Y
         return {
-          gridWidth: Math.max(size.x, minSize),
-          gridHeight: Math.max(size.y, minSize)
+          gridWidth: Math.max(size.x * scale, minSize),
+          gridHeight: Math.max(size.y * scale, minSize)
         }
       } else {
         // Side plane - needs Y and Z
         return {
-          gridWidth: Math.max(size.y, minSize),
-          gridHeight: Math.max(size.z, minSize)
+          gridWidth: Math.max(size.y * scale, minSize),
+          gridHeight: Math.max(size.z * scale, minSize)
         }
       }
     }
-    return { gridWidth: 3, gridHeight: 3 }
+    return { gridWidth: 2, gridHeight: 2 }
   }, [modelBoundingBox, baseNormal])
 
   // Calculate plane rotation for visualization
